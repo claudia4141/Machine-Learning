@@ -1,6 +1,4 @@
----
-title: 'Problem Set 3: Hyperparameter Search, Feature Engineering, and Feature Selection'
-author: "<18030>"
+
 date: |
   | `r format(Sys.time(), '%d %B %Y')`
 output:
