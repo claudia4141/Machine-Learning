@@ -1,6 +1,4 @@
----
-title: "Problem Set 4: Support Vector Machines"
-author: "<18030>"
+
 date: |
   | `r format(Sys.time(), '%d %B %Y')`
 output: pdf_document
