@@ -1,0 +1,207 @@
+---
+title: "Assignment"
+author: "Friedrich Geiecke"
+date: "31 March 2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+__Exercise 1 (5 points)__
+
+Models often predict the mean well, but it is important to see how good their predictions are in the tails of the outcome distribution. This exercise is about creating a plot function which provides some insight into this.
+
+Save only your predicted median house values and the true median house values from the lab Exercise 1b) to disk and load them again in this notebook. In the end you should have 4 vectors: `y_test`, `y_test_hat`, `y_train`, `y_train_hat`.
+
+Now write the following function `diagnostics_plot(y, y_hat)` which can be used with both the training and the test vector pairs. In the function:
+
+- Sort the observations in `y`
+- Divide `y` into 10 equal groups
+- For each group, compute the associate mean of `y`. Then also compute the mean of `y_hat` for the same observations (i.e. the same indices of observations). This should give 10 means for `y` and 10 means for `y_hat`
+- Then print out a plot of these 10 values against each other. The `y` means are on the x-axis, the `y_hat` means on the y-axis. Also add a 45 degree line to the plot.
+
+1. Write the function `diagnostics_plot(y, y_hat)`.
+```{r, warning=FALSE}
+#load vectors from lab
+y_test <- read.csv("housing_y.csv", header = TRUE)
+test_hat <- read.csv("housing_y_pred.csv", header = TRUE)
+y_train <- read.csv("housing_y_training.csv", header = TRUE)
+train_hat <- read.csv("housing_y_training_pred.csv", header = TRUE)
+
+#create function
+diagnostics_plot <- function(y, y_hat){
+  #sort the observation
+  order_y <- y[order(y$x),]
+  #split into 10 equal groups
+  no <- rep(c(1:10), each = nrow(y)/10)
+  #create a data frame to store the group number with the assorted y
+  group <- data.frame(cbind(order_y, no))
+  #mean for observed values
+  mean <- tapply(group$x, group$no, mean)
+  #match the indices of the predicted values and the observed values
+  hat <- y_hat$X1[match(group$X,y_hat$X)]
+  hat_mean <- tapply(hat, group$no, mean)
+  #hat_mean
+  #plot the values against each other
+plot(mean, hat_mean, main = "Diagnotics plot", xlab = "mean for observed values", ylab = "mean for predicted values")
+#add a 45 degree line
+segments(min(mean), min(hat_mean), max(mean), max(hat_mean))
+}
+
+```
+
+2. Run the function twice to create one plot for the training data and one plot for the test data.
+```{r, warning=FALSE}
+diagnostics_plot(y_train, train_hat)
+diagnostics_plot(y_test, test_hat)
+```
+
+
+__Exercise 2 (8 points)__
+
+This exercise studies optimal thresholds in classifiers. We commonly assume that every observation above predicted probability 0.5 is predicted to be 1. Yet, the optimal value of a threshold depends on the concrete task.
+
+Imagine you are working in a bank which tries to automatically block likely fraudulent credit card transactions. Blocking and subsequently manually investigating a transaction costs a fixed amount of 30 Pounds. You only have to pay this if the transaction turned out not to be fraudulent, otherwise your insurer is going to pay the 30 Pounds. Not blocking a fraudulent transaction on the other hand, means that the bank looses the amount of the transaction. This implies the following costs:
+
+- Blocking a transaction that turned out not to be fraudulent: 30 Pounds
+
+- Not blocking a transaction that turned out to be fraudulent: The value contained in the column `amount`
+
+Train a logistic classifier with `glm` on the `credit_train.csv` to predict whether a transaction is fraudulent (i.e. its `class` is 1). Then use this model to obtain predicted probabilities of fraud for each of the observations on the training and the test set. Next, create a grid of around 100 threshold values between 0 and 1. For each of these threshold values compute and store the total associated cost. Compute this for both training and test set. In the end you should have:
+
+- One vector with threshold values
+
+- One vector with associated training set costs
+
+- One vector with associated test set costs
+```{r}
+library(glmnet)
+set.seed(100)
+train_credit <- read.csv("credit_train.csv")
+test_credit <- read.csv("credit_test.csv")
+#create the model and predicted values
+mod <- glm(class~v1+v2+amount, data = train_credit, family = "binomial")
+train_credit$pred <- predict(mod, type = "response")
+test_credit$pred <- predict(mod, test_credit, type = "response")
+#a vector with threshold values
+thre <- seq(0,1,0.01)
+thre <- thre[-1]
+#training cost
+train_cost <-vector("numeric")
+for(i in thre){
+  train_credit$p <- ifelse(train_credit$pred >i, 1,0)
+  a <- length(train_credit$X[train_credit$class ==0 & train_credit$p == 1])
+   if (a > 0){
+    a <- a*30
+  }
+  b <- sum(train_credit$amount[intersect(x=which(train_credit$class == 1), y = which(train_credit$p == 0))])
+  total_cost <- a+b
+  train_cost <- rbind(total_cost,train_cost)
+}
+#testing  costs
+test_cost <-vector("numeric")
+for(i in thre){
+  test_credit$p <- ifelse(test_credit$pred >i, 1,0)
+  a <- length(test_credit$X[test_credit$class ==0 & test_credit$p == 1])
+   if (a > 0){
+    a <- a*30
+  }
+  b <- sum(test_credit$amount[intersect(x=which(test_credit$class == 1), y = which(test_credit$p == 0))])
+  total_cost <- a+b
+  test_cost <-rbind(total_cost, test_cost)
+}
+```
+
+1. Plot the training and test set costs on the y-axis and the thresholds on the x-axis.
+```{r}
+library(ggplot2)
+df <- data.frame(thre, test_cost, train_cost)
+colnames(df) <- c("thre", "test", "train")
+df$test <- rev(df$test)
+df$train <- rev(df$train)
+ggplot(data =df)+
+  geom_point(aes(x=thre, y= test), color = "blue")+
+  geom_point(aes(x=thre, y=train), color = "red")+
+  xlab("threshold values")+
+  ylab("training and test set costs")
+```
+
+2. What are the thresholds for training set and test set that would minimise the costs?
+**The threshold for the training set is 0.14 and 0.25 for the test set.**
+```{r}
+#training set costs
+df <- df[order(df$train),]
+head(df[,c("thre")], n=1)
+#test set cost
+df <- df[order(df$test),]
+head(df[,c("thre")], n=1)
+```
+
+3. What are the associated minimal training and test set costs?
+**The associated minimal training cost is 9817 and  for test set cost. So, the total cost is 6425.9**
+```{r}
+#training set costs
+df <- df[order(df$train),]
+head(df[,c("thre", "train")], n=1)
+#test set cost
+df <- df[order(df$test),]
+head(df[,c("thre", "test")], n=1)
+```
+
+4. How does this compare to the costs on training and test set if a 0.5 threshold classifier was used, how to the costs if no automated detection was used at all?
+**The training and test cost if a 0.5 threshold classifier was used is higher. Compared to the costs if no automated detection was used(here, we use 0.01 as an approximate to 0 ), the costs are significantly higher than the threshold that would minimize the cost.**
+```{r}
+#0.5 threshold classifier
+df[df[, 1]=="0.5", ]
+
+df[df[, 1]=="0.01", ]
+```
+
+__Exercise 3 (7 points)__
+
+Use the cifar data set from the lecture coding example `cnn
+..Rmd`. Keeping the training and test samples exactly the same as in the lecture code, can you achieve a higher accuracy than what we found in the lecture? For example, modify the CNN and try different combinations of layers, amounts of filter, the kernel sizes of the individual filters, regularisation (note: it is not advisable to use dropout in the convolutional layers), more training epochs, etc. Another options is to explore alternative model architectures for the cifar task here: https://github.com/rstudio/keras/tree/master/vignettes/examples. If you use another model, briefly read up about the model and give a short summary of one paragraph in your own words how this model broadly works and why it likely outperforms the simple CNN.
+**validation accuracy is 0.6645 from the model in the lecture.**
+**Validation accuracy is 0.7641 for this model.**
+```{r, eval= FALSE}
+library(keras)
+library(tensorflow)
+cifar <- dataset_cifar10()
+model1 <- keras_model_sequential() %>% 
+  layer_conv_2d(filters = 32, kernel_size = c(3,3), activation = "relu", 
+                input_shape = c(32,32,3)) %>% 
+  layer_batch_normalization()%>%
+ # layer_max_pooling_2d(pool_size = c(2,2)) %>% 
+  layer_conv_2d(filters = 64, kernel_size = c(3,3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2,2)) %>% 
+  layer_batch_normalization()%>%
+  layer_conv_2d(filters = 64, kernel_size = c(3,3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2,2)) %>% 
+  layer_batch_normalization()%>%
+  layer_conv_2d(filters = 128, kernel_size = c(3,3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2,2)) %>% 
+  layer_batch_normalization()%>%
+  layer_flatten() %>% 
+  layer_dense(units = 256, activation = "relu") %>% 
+  layer_batch_normalization()%>%
+  layer_dense(units = 128, activation = "relu") %>% 
+  layer_batch_normalization()%>%
+  layer_dense(units = 10, activation = "softmax")
+summary(model1)
+model1 %>% compile(
+  optimizer = "adam",
+  loss = "sparse_categorical_crossentropy",
+  metrics = "accuracy"
+)
+history <- model1 %>%
+  fit(
+    x = cifar$train$x, y = cifar$train$y,
+    epochs = 10,
+    bacth_size = 64,
+    validation_data = unname(cifar$test),
+    verbose = 2
+  )
+evaluate(model1, cifar$test$x, cifar$test$y, verbose = 0)
+```
+
+

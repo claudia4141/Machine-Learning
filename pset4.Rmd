@@ -1,0 +1,338 @@
+---
+title: "Problem Set 4: Support Vector Machines"
+author: "<18030>"
+date: |
+  | `r format(Sys.time(), '%d %B %Y')`
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+set.seed(1)
+```
+
+1. This question makes use of replication data for the paper [Ex Machina: Personal Attacks Seen at Scale](https://arxiv.org/abs/1610.08914) by Ellery Wulczyn, Nithum Thain, and Lucas Dixon. The paper introduces a method for crowd-sourcing labels for personal attacks and then draws several inferences about how personal attacks manifest on Wikipedia Talk Pages. They find that, "the majority of personal attacks on Wikipedia are not the result of a few malicious users, nor primarily the consequence of allowing anonymous contributions from unregistered users."
+
+We will use their data and SVM models to identify personal attacks. Below is code to get you started.
+
+```{r, warning=FALSE, message=FALSE}
+#install.packages("quanteda")
+#install.packages("e1071")
+
+library(quanteda)
+library(e1071)
+
+texts <- read.csv('attacks.csv', stringsAsFactors=F)
+texts$attack <- factor(texts$attack)
+
+corpus <- corpus(texts, text_field="comment") # create a corpus
+dfm <- dfm(corpus) # create features of word counts for each document
+dfm <- dfm_trim(dfm, min_docfreq = 5) # remove word features occurring in < 5 docs
+
+tr <- 1:1000 # indexes for training data
+te <- 1001:1300 # indexes for test data
+
+mod <- svm(x=dfm[tr,], y=factor(texts$attack[tr]),
+           kernel="linear", cost=10)
+```
+
+   a) Use the function `tune()` to perform a grid search of different values of C (choose a wide range of values, say 1, 5, 10, 50, 75, 100, 300, and 500, but do not feel the need to limit yourself to this). For your best model, report training and test error in the form of precision, recall, and accuracy. Comment on your results.
+**The error for the testing set are significantly worse than the training set error.**
+```{r}
+#grid search of different values of C
+tune_out <- tune(svm, dfm[tr,],factor(texts$attack[tr]),  kernel = "linear", 
+                ranges = list(cost = c(1, 5, 10, 50, 75, 100, 300, 500)))
+#summary(tune_out)
+#select the best model
+bestmod <- tune_out$best.model
+#summary(bestmod)
+#best model on test set and train set
+tr_pred <- predict(bestmod, dfm[tr,])
+te_pred <- predict(bestmod, dfm[te,])
+#compute confusion matrix
+table(tr_pred, texts$attack[tr])
+table(te_pred, texts$attack[te])
+#create function for precision so I can use it in part d
+precision <- function(pred, y){
+    tab <- table(pred, y)
+    return((tab[2,2])/(tab[2,1]+tab[2,2]))
+}
+print(paste0("precision for training set: ",precision(tr_pred, texts$attack[tr])))
+print(paste0("precision for testing set: ",precision(te_pred, texts$attack[te])))
+#create function for recall
+recall <- function(pred, y){
+    tab <- table(pred, y)
+    return(tab[2,2]/(tab[1,2]+tab[2,2]))
+}
+print(paste0("recall for training set: ",recall(tr_pred, texts$attack[tr])))
+print(paste0("recall for testing set: ",recall(te_pred, texts$attack[te])))
+#create function for accuracy 
+accuracy <- function(pred, y){
+    tab <- table(pred, y)
+    return(sum(diag(tab))/sum(tab))
+}
+print(paste0("accuracy for training set: ",accuracy(tr_pred, texts$attack[tr])))
+print(paste0("accuracy for testing set: ",accuracy(te_pred, texts$attack[te])))
+
+```
+
+   b) How many support vectors are there in your model?
+   **There are 429 support vectors in the model.**
+
+```{r}
+length(bestmod$index)
+```
+
+   c) Look at the documents with the ten highest and lowest coefficients. What do the coefficients represent? Comment on any patterns you see in these documents.
+**The highest coefficient contains features with personal attacks such as "sucks" and "idiotry". However, the feature "Chi-Town's got a New BadAss" with a high coefficient of 10 does not necessarily refer to personal attack. For the lowest coefficients, the associated features are not explicit. While there are some nice words such as "Thank you" and "congratulations". There are some features with punctuation only or only with phrases that does not make too much sense such as "Cucurbita sororia new". Overall, the model identifies the personal attack comments quite we;;**
+```{r}
+df <- data.frame(feature = texts$comment[tr][mod$index],coef = mod$coefs)
+#lowest coefficients
+df <- df[order(df$coef),]
+head(df[,c("coef", "feature")], n = 10)
+#highest coefficients
+df <- df[order(df$coef, decreasing = TRUE),]
+head(df[,c("coef", "feature")], n = 10)
+```
+
+   d) Fit a polynomial SVM of degree 3. Perform a grid search for C. For your best model, report training and test error in the form of precision, recall, and accuracy. Do these measures differ appreciably from the linear SVM? Why/why not?
+**These measures differ appreciably from the linear SVM.**
+```{r}
+polytune_out <- tune(svm, dfm[tr,],factor(texts$attack[tr]),  kernel = "polynomial", 
+                ranges = list(cost = c(1, 5, 10, 50, 75, 100, 300, 500)), degree = 3)
+#summary(polytune_out)
+pbestmod <- polytune_out$best.model
+#summary(pbestmod)
+ptr_pred <- predict(pbestmod, dfm[tr,])
+pte_pred <- predict(pbestmod, dfm[te,])
+print(paste0("precision for training set: ",precision(ptr_pred, texts$attack[tr])))
+print(paste0("precision for testing set: ",precision(pte_pred, texts$attack[te])))
+print(paste0("recall for training set: ",recall(ptr_pred, texts$attack[tr])))
+print(paste0("recall for testing set: ",recall(pte_pred, texts$attack[te])))
+print(paste0("accuracy for training set: ",accuracy(ptr_pred, texts$attack[tr])))
+print(paste0("accuracy for testing set: ",accuracy(pte_pred, texts$attack[te])))
+
+```
+
+2. For each of the following datasets from the `mlbench` package: 
+   - Generate 100 observations. Plot and comment on the functional form of the ideal decision boundary (1 sentence).
+   - Find the best svm model for linear, polynomial, and radial SVMs. Use the function `tune()` to perform a grid search of the relevant hyperparameters defined in the code chunk below.
+   - Report 10-fold CV error, and the relevant hyperparameter values for the best linear, polynomial, and radial models.  *(Hint: the `tune()` object contains a data frame of the 10-fold CV error and the hyperparameter values for each model in the grid search under `performances`. You can access this data frame with the `$` operator in the same way we accessed the best model in the SVM lab.)*
+   - Plot decision boundaries of the best linear, polynomial, and radial models.
+   - Compare the performance of the different kernels. Explain why you do or do not see any differences in performance across each kernel (3-5 sentences).
+
+```{r}
+library(mlbench)
+library(e1071)
+
+degrees <- 2:6
+gammas <- c(.01, .1, .5, 1, 5)
+Cs <- c(.0001, .01, 1, 10, 100)
+
+```
+
+   a) `mlbench.circle()`\
+**The functional form of the ideal decision boundary should be radial which takes the form $K(x_i, x_i') = (1 + \sum_{j=1}^{p}(x_ij, x_i'j)^d)$ where $d$ is a positive integer. The linear kernel performs the worst among all of the kernels. This is expected as the relationship between the predictors and the outcome is non-linear, the performance of linear regression also suffers. P The radial kernel generates the 10-fold CV error:0.1000. Finally, the polynomial kernel at degree 2 with a cost of 1 generates the lowest 10-fold CV error of 0.0500. This result is expected as the inputs are uniformly distributed on the d-dimensional cube which is similar to the polynomial kernel of degree d. As we have two dimensions of the circle problem, it is expect the polynomial kernel with degree 2 will provide the lowest 10 fold CV error.**
+```{r}
+#??mlbench.circle
+set.seed(1)
+#function form of the ideal decision boundary should be radial
+circle <- mlbench.circle(100,2)
+plot(circle)
+#split the data into train and test set
+circle_x <- circle$x
+circle_y <- circle$classes
+test_idx <- sample(1:100, 20) #80% for training and 20% for testing 
+circle_x_train <- circle_x[-test_idx,]
+circle_x_test <- circle_x[test_idx,]
+circle_y_train <- circle_y[-test_idx]
+circle_y_test <- circle_y[test_idx]
+#circle training set
+ctrain <- data.frame(x = circle_x_train, class = as.factor(circle_y_train))
+# best svm model for linear and plot
+lctune_out <- tune(svm, class~., data = ctrain , kernel = "linear", ranges = list(cost = Cs))
+lcbest_mod <- lctune_out$best.model
+lcbest_mod
+plot(lcbest_mod, ctrain)
+#best svm model for radial and plot
+rctune_out <- tune(svm, class~., data = ctrain , ranges = list(cost = Cs, gamma = gammas), kernel = "radial")
+rcbest_mod <- rctune_out$best.model
+rcbest_mod
+plot(rcbest_mod, ctrain)
+#best svm model for polynomial and plot 
+pctune_out <- tune(svm, class~., data = ctrain , kernel = "polynomial", ranges = list(cost = Cs, degree = degrees))
+pcbest_mod <- pctune_out$best.model
+pcbest_mod
+plot(pcbest_mod, ctrain)
+#report the 10-fold CV error
+summary(lctune_out)
+summary(rctune_out)
+pctune_out <- summary(pctune_out)
+pc <- data.frame(pctune_out[["performances"]])
+```
+
+   b) `mlbench.2dnormals()`
+**The functional form of the ideal decision boundary should be linear which takes the form $K(x_i, x_i') =\sum_{j=1}^{p}(x_ij, x_i'j)$. The linear kernel generates the lowest 10-fold CV error of 0.0750 at the cost of 1. The radial kernel generates the error of 0.0750 at the cost of 10 and gamma 0.01. The polynomial kernel generates the error of 0.1000 at the cost of 1 and degree of 3. The linear and radial kernel both generate the lowest CV error because the centers of these two classes are spaced on circles around the origin with radius r. Although the data seems like to be linearly separable, the classes of this data are centered around a circle.Hence, both the kernel generate the smallest error.**
+```{r}
+set.seed(1)
+#??mlbench.2dnormals
+#function form of the ideal decision boundary should be linear
+norm <- mlbench.2dnormals(100, 2)
+plot(norm)
+#split the data into train and test set
+norm_x <- norm$x
+norm_y <- norm$classes
+test_idx <- sample(1:100, 20) #80% for training and 20% for testing 
+norm_x_train <- norm_x[-test_idx,]
+norm_x_test <- norm_x[test_idx,]
+norm_y_train <- norm_y[-test_idx]
+norm_y_test <- norm_y[test_idx]
+#circle training set
+ntrain <- data.frame(x = norm_x_train, class1 = as.factor(norm_y_train))
+# best svm model for linear and plot
+lntune_out <- tune(svm, class1~., data = ntrain , kernel = "linear", ranges = list(cost = Cs))
+lnbest_mod <- lntune_out$best.model
+lnbest_mod
+plot(lnbest_mod, ntrain)
+#best svm model for radial and plot
+rntune_out <- tune(svm, class1~., data = ntrain , ranges = list(cost = Cs, gamma = gammas), kernel = "radial")
+rnbest_mod <- rntune_out$best.model
+rnbest_mod
+plot(rnbest_mod, ntrain)
+#best svm model for polynomial and plot 
+pntune_out <- tune(svm, class1~., data = ntrain , kernel = "polynomial", ranges = list(cost = Cs, degree = degrees))
+pnbest_mod <- pntune_out$best.model
+pnbest_mod
+plot(pnbest_mod, ntrain)
+#report the 10-fold CV error
+summary(lntune_out)
+summary(rntune_out)
+summary(pntune_out)
+pn <- data.frame(pntune_out[["performances"]])
+
+```
+
+   c) `mlbench.xor()`
+**The functional form of the ideal decision boundary should be radial which takes the form of $K(x_i, x_i') = exp(-\gamma\sum_{j=1}^{p}(x_ij, x_i'j)^2)$ where $\gamma$ is a positive constant. Linear kernel generates an error of 0.4625 which is expected as the data is non-linear separable;radial kernel performs the worst with an error of 0.4875 at the cost of 1e-04 and gamma of 5;polynomial kernel performs the same as linear kernel at the cost of 1e-04 and degree of 2. There is no difference between the most of the kernels because there is 2 class uniformly distributed on the 2-dimensional cube with corners with each pair of opposite corners from one class. Therefore, it is a extremely linear inseparable problem where the hard and soft SVC fail to classify.**
+```{r}
+#??mlbench.xor
+set.seed(1)
+#function form of the ideal decision boundary should be polynomial
+xor <- mlbench.xor(100, 2)
+plot(xor)
+#split the data into train and test set
+xor_x <- xor$x
+xor_y <- norm$classes
+test_idx <- sample(1:100, 20) #80% for training and 20% for testing 
+xor_x_train <- xor_x[-test_idx,]
+xor_x_test <- xor_x[test_idx,]
+xor_y_train <- xor_y[-test_idx]
+xor_y_test <- xor_y[test_idx]
+#circle training set
+xtrain <- data.frame(x = xor_x_train, class2 = as.factor(xor_y_train))
+# best svm model for linear and plot
+lxtune_out <- tune(svm, class2~., data = xtrain , kernel = "linear", ranges = list(cost = Cs))
+lxbest_mod <- lxtune_out$best.model
+lxbest_mod
+plot(lxbest_mod, xtrain)
+#best svm model for radial and plot
+rxtune_out <- tune(svm, class2~., data = xtrain , ranges = list(cost = Cs, gamma = gammas), kernel = "radial")
+rxbest_mod <- rxtune_out$best.model
+rxbest_mod
+plot(rxbest_mod, xtrain)
+#best svm model for polynomial and plot 
+pxtune_out <- tune(svm, class2~., data = xtrain , kernel = "polynomial", ranges = list(cost = Cs, degree = degrees))
+pxbest_mod <- pxtune_out$best.model
+pxbest_mod
+plot(pxbest_mod, xtrain)
+#report the 10-fold CV error
+summary(lxtune_out)
+summary(rxtune_out)
+summary(pxtune_out)
+px <- data.frame(pxtune_out[["performances"]])
+```
+
+3. Compare the decision boundary and hyperparameter values of your best two polynomial models and your worst two polynomial models (according to CV error) from part b) in the previous problem. What made these models good/bad? (3-5 sentences)\
+**The two best models are the one on the circle data. These models are good because it transforms the data to linearly separable in higher dimensions. By using the polynomial kernel, we are optimizing to fit the higher dimensional decision boundary which only includes the dot product of the transformed feature vectors. The worse models are on the normal data which is linearly separable. This is because the true form of the data is linear and polynomial kernel will be overfitting the data as we increase the degree of polynomial. Hence, the highest degree 6 of polynomial kernel resulted in the worse model with an error of 0.6375 **
+```{r} 
+#combine all the polynomial models into a dataframe
+all_p <- data.frame(rbind(pc,pn,px))
+circle <- rep("circle", 25)
+normal <- rep("normal", 25)
+xor <- rep("xor", 25)
+all_p$data <- c(circle, normal, xor)
+all_p
+#two best polynomial models
+all_p <- all_p[order(all_p$error),]
+head(all_p[,c("cost", "error", "data", "degree")], n=2)
+best1 <- svm(class~., data = ctrain, kernel = "polynomial", cost = 1, degree = 2)
+plot(best1, ctrain)
+best2 <- svm(class~., data = ctrain, kernel = "polynomial", cost = 10, degree = 4)
+plot(best2, ctrain)
+#two worse polynomial models
+all_p <- all_p[order(all_p$error, decreasing=TRUE),]
+head(all_p[,c("cost", "error", "data", "degree")], n=2)
+worst1 <- svm(class1~., data = ntrain, kernel = "polynomial", cost = 1e-04, degree = 6)
+plot(worst1, ntrain)
+worst2 <- svm(class1~., data = ntrain, kernel = "polynomial", cost = 1e-04, degree = 2	)
+plot(worst2, ntrain)
+```
+
+4. ISLR 9.7 Exercise
+Q4)
+**The testing misclassification error is significantly higher for the linear kernel than the radial kernel.**
+```{r}
+library(ggplot2)
+x <- matrix(rnorm(100*2), ncol = 2)
+x[1:30,] <- x[1:30,]+3
+x[31:70,] <- x[31:70,]-3
+class <- c(rep(-1,70), rep(1,30))
+nonlinear_data <- data.frame(x = x, class = as.factor(class))
+#plot the graph to show there is a visible but non-linaer separation between the two classes
+ggplot(nonlinear_data, aes(x.1, x.2, colour = factor(class))) +
+  geom_point()
+#generate the train and test set
+idx <- sample(1:nrow(nonlinear_data), 70)
+nonlinear_train <- nonlinear_data[-idx,]
+nonlinear_test <- nonlinear_data[idx, ]
+```
+
+```{r}
+#linear kernel with best model
+ltune_out  <- tune(svm, class~., data = nonlinear_train, kernel = "linear", ranges=list(cost=c(0.001,0.01,0.1,1,5,10,100)))
+lbest_mod <- ltune_out$best.model
+plot(lbest_mod, nonlinear_data)
+#predict on train set 
+train_lpred <- predict(lbest_mod, nonlinear_train)
+table(predict = train_lpred, truth = nonlinear_train$class)
+accuracy(train_lpred, nonlinear_train$class)
+print(paste0("misclassification error for linear training set: ",mean(train_lpred != nonlinear_train$class)))
+#predict on test set
+test_lpred <- predict(lbest_mod, nonlinear_test)
+table(test_lpred, nonlinear_test$class)
+accuracy(test_lpred, nonlinear_test$class)
+print(paste0("misclassification error for linear testing set: ", mean(test_lpred != nonlinear_test$class)))
+```
+- The svm with a linear kernel classifies 20/70 training observations and 10/30 of the test observations wrongly.
+  
+  - The svm with a radial kernel classifies all observations correctly.
+```{r}
+#radial kernel
+tune_out <- tune(svm, class~., data = nonlinear_train, kernel = "radial",
+                ranges = list(cost = c(0.1,1,10,100,1000), gamma = c(0.5,1,2,3,4)))
+rbestmod <- tune_out$best.model
+#summary(bestmod)
+#plot for radial kernel
+plot(rbestmod, nonlinear_train)
+#predict on train set
+train_rpred <- predict(rbestmod, nonlinear_train)
+table(train_rpred, nonlinear_train$class)
+print(paste0("misclassification error for radial training set: ", mean(train_rpred != nonlinear_train$class)))
+#predict on test set
+test_rpred <- predict(rbestmod, nonlinear_test)
+table(test_rpred, nonlinear_test$class)
+accuracy(test_rpred, nonlinear_test$class)
+print(paste0("misclassification error for radial testing set: ",mean(test_rpred != nonlinear_test$class)))
+```
+
