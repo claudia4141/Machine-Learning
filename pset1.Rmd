@@ -1,0 +1,181 @@
+---
+title: 'Problem Set 1: R, R Markdown, Conceptual Foundations of ML'
+author: "Candidate Number:18030"
+date: "08 February 2021"
+output: pdf_document
+
+---
+```{r, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(out.height = "\\textheight",  out.width = "\\textwidth")
+set.seed(1)
+options(tinytex.verbose = TRUE)
+```
+
+## Part 1: Short Answer Questions
+
+1. Imagine you have been hired as a data consultant. Your client has given you the task of building a classifier for a new dataset they have constructed. In each of the following 5 scenarios, would you recommend a flexible statistical learning method or an inflexible approach? Why? (2-3 sentences per scenario)
+    a) There is a large sample size of $N=5 \text{ billion}$, a large number of predictors $p=100,000$, and the client is limited in their computing resources. **An inflexible method is recommended, yet a flexible method would perform better since we have a larger sample size and larger number of predictors.However, since the client is limited in their computing resources and a large number of predictors will make flexible method more costly, an inflexible method would be a better option.**
+    b) Large sample size of $N=5 \text{ billion}$, and small number of predictors $p=6$.**With a larger sample size, a flexible method will fit the data closer. The larger sample size will also reduce the problem of overfitting which is the main disadvantage of flexible method. Lastly, since we have a small number of predictors, the computational cost will not be expensive for the client.**
+    c) Large number of predictors, $p=125,000$, sample size $N=2000$ is relatively small.**Inflexible  method because the flexible method tends to overfit data when the sample is small. Moreover, due to the small sample size, a small change in the data could result in a large change in which resulted in a higher variance. By employing the inflexible method, we can reducethe variance** 
+    d) Based on exploratory analysis of the data, it appears that the predictors and the response have a non-linear relationship. **Flexible method because the increase in flexibility allows us to the non-linear relationship and also reduce the bias.**
+    e) The error term has very large variance.**Inflexible learning method because the flexible method will try to fit the noise in error term and further increase the variance, and therefore resulted in overfitting which means they follow the the errors or noise too closely.** 
+
+2. How is a **parametric** approach different from a **non-parametric** approach to statistical learning? How does each approach go about estimating $f$? Name three advantages and three disadvantages of each approach. (2-3 sentences per approach)\
+**parametric approach is different from a non-parametric approach in the way that it estimates f. For parametric approach, it estimates f by two-step model-based approach. First, we assume $f(x)$ is linear. Then, after selecting a model, we need to estimate the parameters from the training data. Hence, parametric approach is reducing the problem of estimate f down to one of estimating a set of parameters.The non-parametric approach does not make assumptions on the functional for of $f$. Instead, it estimates f by getting as close as possible to the data. Therefore, a large sample is needed to estimate $f$ accurately.**
+**pros for parametric: More interpretable, require less data as they do not require much training data, better for inference. COns : unlikely to match the underlying function because the functional form is specified, limited complexity and potentially an inaccurate estimate of $f$.**
+**pros for non-parametric: potentially to be more accurate as it avoids making assumption of the functional form, flexibility as it can fit a large number of functional form, higher performance for prediction. Cons: pron to overfitting, require a lot more data and slower to train.**
+
+3. _ISL 2.4 Exercise 2_
+**2(a) Regression Problem. We are interested in inference as we are interested in understanding which factors are affecting the CRO salary. n is 500 firms in the US and p is the profit, number of employees and the industry.**
+**2(b) Classification problem. We are interested in prediction as we are predicting whether the new product will be a success or fail. As the problem is with two classes, it is also knows as a binary classification problem. n is 20 similar products launched before and p is price charged for the product, marketing budget, competition price and ten other variables.**
+**2(c) Regression problem. We are interesting in prediction  as we are interesting in predicting the % change in USD/Euro exchange rate. n is weekly data for all of 2012 which is 52 and p is % change in the USD/EURO, the % change in the US market, the % change in the British market and the % change in the German market.**
+
+4. _ISL 2.4 Exercise 3_
+The irreducible error is a constant because it is a noise that the method cannot fit. This line also lies below the test error curve because the the expected test error will always be greater than $Var$. The training error declines monotonically as flexibility increase. This is because when flexibility increase, the curve fit the data more closely. The test error is a convex curve.Initially, it declines as flexibility increase but at the turning point, it starts to increase again because when a curve yield a small training error but a large test error, it is overfitting the data.Squared bias curve decline monotonically Variance and the variance increase monotonically; as we use more flexible method, the variance will increase and the bias will decrease. This is also known as the 'Bias-Variance Tradeoff'.
+```{r}
+knitr::include_graphics("graph.png")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+5. What are the two kinds of "big data" Rocio Titiunik wrote about in her paper on big data? What are some benefits and drawbacks of each kind of big data analysis for social scientific inquiry? Can either kind of big data solve the fundamental problem of causal inference? (5-10 sentences)
+ 
+**The first type is big data as large N. The benefit of large N is that is it help for increasing the precision of estimates or the power of hypothesis tests. It can also allow for a wider range of estimation methods that would be unreliable with few observations. However, the drawback is that large N does not automatically remove or even alleviate the ability to estimate consistently the parameters of interest and to make valid and robust statistical inferences. Yet, it cannot solve the fundamental problem of causal inference because no increase in the number of observations can make the omitted variable bias in a misspecificed linear regression model to disappear. The second type is big data as large P. The benefit of large p is that it brings more more information and provide a more complete picture of the individual than a small dataset. Yet, it still cannot solve the fundamental problem of causal inference. Causal inference based on large p datasets still require the assumption that there is no important omitted variables and have not included post-treatment variables. Yet, it is not possible to include all the unobservable variables.**
+
+## Part 2: Coding Question 
+
+6. In the next problem set, we will use `for` loops and `if`/`else` statements to implement $k$-fold cross-validation. To prepare you for this, we'll practice them using the [fibbonacci sequence](https://en.wikipedia.org/wiki/Fibonacci_number). The fibbonacci sequence is a sequence where each number is the sum of the two preceding ones: $(0,) 1, 1, 2, 3, 5, \dots$. Using `for` loops and `if`/`else` statements, write code that will output the sum of the first 50 terms of the fibbonacci sequence. Include zero as the first term.
+
+```{r}
+fib <- function(n){
+  if (n == 1){
+    return(0) #sum of the first term is zero
+  } else{
+  fib <- vector () #create an empty vector 
+  fib[1] <- 0 #include zero as the first term 
+  fib[2] <- 1
+}
+  for(i in 3:n){
+    fib[i] <- fib[i-1] + fib[i-2] #store all the numbers back to the empty vector
+  }
+  return(sum(fib)) #return the sum of all numbers
+}
+
+fib(50)
+```
+
+7. _ISL 2.4 Exercise 10_ (Note: 1. You will need to install the `MASS` library from CRAN. 2. Please break text out of code blocks when explaining or reporting your answers.)
+**There 506 rows and 14 columns in this table. The rows represent the data entry and the columns represent different predictors such as per capita crime rate by town that would affect the housing value in suburbs of Boston.**
+```{r}
+# Code for 10 a) goes here
+library(MASS)
+#?Boston
+dim(Boston)
+```
+**Crime seems to have correlation with tax, age, dis(weighted mean of distances to five Boston employment centres). As we cannot these plots are too small,a better way to view them will be plotting them individually.**
+```{r}
+# Code for 10 b) goes here
+pairs(Boston)
+plot(Boston$tax, Boston$crim)
+plot(Boston$age, Boston$crim)
+plot(Boston$dis, Boston$crim)
+plot(Boston$dis, Boston$lstat)
+```
+
+```{r}
+# Code for 10 c) goes here
+plot(Boston$tax, Boston$crim)
+#higher tax at $680 seems to have a higher crime rate
+plot(Boston$age, Boston$crim)
+#home that are build prior to 1940 also seem to experience a higher crime rate
+plot(Boston$dis, Boston$crim)
+#Crime decrease with a shorter distance to employment centers
+plot(Boston$ptratio, Boston$crim)
+#higher pupil-teach ratio have more crime
+plot(Boston$lstat, Boston$crim)
+#no obvious correlation between lower status of population and crime rate
+plot(Boston$rad, Boston$crim)
+#more accessible to radial highways also experience more crime 
+```
+**Most of the areas have low crime rate at 0, so there is no particular suburbs appear to have high crime rates. Suburb 381 has the highest crime rate. Suburb 489 has the highest tax rate. Suburb 355 has the highest pupil-teacher ratio at 22.**
+```{r}
+# Code for 10 d) goes here
+hist(Boston$crim, breaks = 50)
+which.max(Boston$crim)
+hist(Boston$tax, breaks = 50)
+which.max(Boston$tax)
+hist(Boston$ptratio, breaks = 50)
+which.max(Boston$ptratio)
+```
+**There are 35 suburbs in this dataset bound the Charles river.**
+```{r}
+# Code for 10 e) goes here
+subset(Boston, chas == 1)
+```
+**The median pupil-teacher ration among the towns in this data set is 19.05.**
+```{r}
+# Code for 10 f) goes here
+median(Boston$ptratio)
+```
+**Suburb 399 has the lowest median value of owner-occupied homes. However, it has a high crime rate compared to median crime rate of overall crime rate in suburb. The house are 100% were built before 1940 which is the the highest among the suburbs. It is also not located on the Charles River. The index of accessibility to radial highways is also the highest among the suburbs.The pupil-teacher ratio is also high which is in the 3rd quantile of all the suburbs.**
+```{r}
+# Code for 10 g) goes here
+Boston[which.min(Boston$medv),]
+summary(Boston)
+```
+**In this dataset, there are 64 suburbs average more than seven rooms per dwelling and 13 suburbs with more than eight rooms per dwelling. The median crime rate in suburbs with eight or more rooms on average is higher than the overall dataset.**
+```{r}
+# Code for 10 h) goes here
+sum(Boston$rm > 7)
+sum(Boston$rm > 8)
+summary(Boston[Boston$rm > 8,])
+```
+
+8. Using R Markdown, write some notes on the differences between supervised and unsupervised approaches to statistical learning. Use headers of different sizes, italic and bold text, numbered lists, bullet lists, and hyperlinks. If you would like, use inline [LaTeX](https://en.wikipedia.org/wiki/LaTeX) (math notation).
+
+# Supervised approaches\
+
+## What is supervised learning?
+You train the machine with labeled data, the algorithm will then learn from this set of labeled and predict the outcome.
+
+## Why use supervised learning?
+
+1. allow us to collect data or produce a data output from the previous experience
+2. Helps us to optimize performance criteria using experience
+*examples: regression,classification*\
+applications in real-life:
+
+-   Face detection
+-   Spam detection
+-   Weather forecasting
+
+# Unsupervised approaches\
+
+## What is unsupervised learning?
+It does need to supervise model, it will work on its own to discover information. It allow us to perform more complex processing tasks compared to supervised learning.
+
+## Why use unsupervised learning?
+
+1.    Unsupervised machine learning finds all kind of unknown patterns in data
+2.    Unsupervised methods help you to find features which can be useful for categorization
+3.    It is taken place in real time, so all the input data to be analyzed and labeled in the presence of learners
+*examples: clustering, dimensionality reduction*\
+applications in real-life:
+
+-   Fraud detection
+-   Malware detection
+
+
+
