@@ -1,13 +1,4 @@
----
-title: "Assignment"
-author: "Friedrich Geiecke"
-date: "31 March 2021"
-output:
-  pdf_document: default
-  html_document: default
----
-
-__Exercise 1 (5 points)__
+--
 
 Models often predict the mean well, but it is important to see how good their predictions are in the tails of the outcome distribution. This exercise is about creating a plot function which provides some insight into this.
 
