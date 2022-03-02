@@ -1,10 +1,4 @@
----
-title: 'Problem Set 1: R, R Markdown, Conceptual Foundations of ML'
-author: "Candidate Number:18030"
-date: "08 February 2021"
-output: pdf_document
 
----
 ```{r, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(out.height = "\\textheight",  out.width = "\\textwidth")
